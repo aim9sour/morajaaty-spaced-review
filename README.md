@@ -1,28 +1,33 @@
-# Morajaaty - مراجعتي
+# Morajaaty
 
-منصة مراجعة متباعدة محلية، سريعة، وخفيفة مبنية بـ FastAPI وSQLite وواجهة HTML/CSS/JavaScript أصلية. صممت لتساعدك تبني بنك بطاقات تعلم من ملفات JSON، تراجعها بخوارزمية مخصصة، وتتابع أداءك بمساعدة رفيق ذكاء اصطناعي يستطيع قراءة إحصائياتك المحلية وتحليل تقدمك.
+**A local-first spaced repetition platform with custom scheduling, JSON imports, learning analytics, and an AI study companion.**
 
-## لماذا مراجعتي؟
+Morajaaty is a lightweight study system built with FastAPI, SQLite, and a vanilla HTML/CSS/JavaScript frontend. It is designed for learners who want full control over their study data, a fast local workflow, and a practical review algorithm that adapts to how well each card is remembered.
 
-- تعمل محليا بالكامل: التطبيق وبياناتك محفوظة على جهازك في SQLite.
-- خوارزمية مراجعة مخصصة: انتقال ذكي بين مرحلة التعلم والمراجعة حسب إجابات `easy` و`hard` و`wrong`.
-- جدولة مرنة: فواصل مراجعة متدرجة مع توزيع تلقائي للأيام الثقيلة حتى لا تتراكم البطاقات في يوم واحد.
-- وكيل ذكاء اصطناعي للتعلم: رفيق داخل التطبيق يساعدك في فهم أدائك وسؤال قاعدة بيانات المراجعات بصلاحيات قراءة فقط.
-- إحصائيات عملية: عدد البطاقات، المستحق اليوم، مراحل التعلم والمراجعة، الدقة، وسجل الإجابات.
-- استيراد JSON سريع: ارفع بطاقاتك بصيغ متعددة وابدأ المذاكرة مباشرة.
-- واجهة عربية RTL: تجربة هادئة ومباشرة بدون إطار عمل واجهات ثقيل.
+The project runs entirely on your machine by default. Your cards, review history, settings, and API keys are stored locally in SQLite. The AI companion is optional and can be enabled by adding your own Gemini API key from the settings page.
 
-> ملاحظة: التطبيق وبياناته يعملان محليا. ميزة رفيق الذكاء الاصطناعي اختيارية وتحتاج أن تضيف مفتاح Gemini API الخاص بك من صفحة الإعدادات.
+## Highlights
 
-## التقنيات
+- **Local-first by design**: no hosted backend, no mandatory account, no remote database.
+- **Custom spaced repetition engine**: cards move between learning and review stages based on `easy`, `hard`, and `wrong` answers.
+- **Load-balanced scheduling**: longer intervals are placed near the target date while avoiding overloaded review days.
+- **JSON-first imports**: bring your own flashcards in simple `question`/`answer` or `front`/`back` formats.
+- **AI study companion**: ask questions about your progress, due workload, difficult cards, and review history.
+- **Read-only analytics tools for the agent**: the companion can inspect local statistics and run safe SQLite read queries.
+- **Fast, dependency-light frontend**: no heavy UI framework; just HTML, CSS, and JavaScript.
+- **Arabic RTL interface**: built for Arabic study workflows while keeping the codebase straightforward and portable.
 
-- Python 3.12+
-- FastAPI
-- SQLite
-- Vanilla HTML/CSS/JavaScript
-- Server-Sent Events للبث الحي من رفيق الذكاء الاصطناعي
+## Tech Stack
 
-## التشغيل محليا
+- **Backend**: FastAPI
+- **Database**: SQLite
+- **Frontend**: Vanilla HTML, CSS, JavaScript
+- **AI integration**: Gemini API with streaming responses
+- **Transport**: Server-Sent Events for live assistant output
+
+## Quick Start
+
+### Windows PowerShell
 
 ```powershell
 python -m venv .venv
@@ -30,13 +35,13 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-افتح التطبيق:
+Open:
 
 ```text
 http://127.0.0.1:8000
 ```
 
-على Linux/macOS:
+### Linux / macOS
 
 ```bash
 python3 -m venv .venv
@@ -45,109 +50,130 @@ pip install -r requirements.txt
 uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-## طريقة الاستخدام
+Open:
 
-1. افتح صفحة الأقسام وأنشئ قسما رئيسيا.
-2. أنشئ قسما فرعيا داخل القسم الرئيسي.
-3. ارفع ملف JSON يحتوي على البطاقات داخل القسم الفرعي.
-4. ابدأ جلسة المراجعة من القسم الفرعي أو من القسم الرئيسي لمراجعة كل ما بداخله.
-5. استخدم `سهل`، `صعب`، أو `خطأ` حتى تعيد الخوارزمية جدولة البطاقة.
-6. من صفحة الإعدادات يمكنك إضافة مفتاح Gemini API لتفعيل رفيق التعلم.
+```text
+http://127.0.0.1:8000
+```
 
-## صيغة ملف البطاقات
+## How It Works
 
-الصيغة الأساسية:
+Morajaaty organizes learning content into main categories and subcategories. Cards are imported into subcategories as JSON files, then reviewed through a focused study session.
+
+Each card starts in the **learning** stage. Repeated `easy` answers graduate the card into the **review** stage. `hard` and `wrong` answers reset or increase the required effort so weak cards get more attention instead of being pushed too far into the future.
+
+Review intervals progress through:
+
+```text
+1 day -> 3 days -> 7 days -> 15 days -> 32 days -> 90 days
+```
+
+For longer intervals, the scheduler checks nearby dates and prefers a day with a lighter workload. This keeps review sessions more balanced over time.
+
+## AI Study Companion
+
+The built-in companion is designed to be useful rather than decorative. When enabled, it can answer questions about your actual local study data using read-only tools:
+
+- platform statistics
+- database schema inspection
+- safe SQLite `SELECT`, `WITH`, and `PRAGMA` queries
+
+Example questions:
+
+- Which cards are causing the most mistakes?
+- How many cards are due today?
+- Which category needs the most attention?
+- Did my accuracy improve over the last week?
+- What should I review first?
+
+The companion requires a Gemini API key, which you can add from the settings page. Without a key, the rest of the application still works locally.
+
+## Import Format
+
+Morajaaty accepts a plain array:
 
 ```json
 [
   {
-    "question": "ما هو مفهوم المراجعة المتباعدة؟",
-    "answer": "طريقة تعلم تعتمد على تكرار المعلومة في فواصل زمنية متزايدة.",
-    "notes": "الملاحظات اختيارية."
+    "question": "What is spaced repetition?",
+    "answer": "A learning technique that reviews information at increasing intervals.",
+    "notes": "Optional notes can be attached to each card."
   }
 ]
 ```
 
-ويدعم التطبيق أيضا:
+It also supports `front` and `back` fields:
 
 ```json
 [
   {
-    "front": "السؤال",
-    "back": "الإجابة",
-    "notes": "ملاحظات اختيارية"
+    "front": "Question",
+    "back": "Answer",
+    "notes": "Optional notes"
   }
 ]
 ```
 
-أو:
+Or a wrapped object:
 
 ```json
 {
   "cards": [
     {
-      "question": "السؤال",
-      "answer": "الإجابة"
+      "question": "Question",
+      "answer": "Answer"
     }
   ]
 }
 ```
 
-يوجد مثال جاهز في [examples/cards.sample.json](examples/cards.sample.json).
+See [examples/cards.sample.json](examples/cards.sample.json) for a ready-to-use sample.
 
-## كيف تعمل الخوارزمية؟
+## Privacy Model
 
-كل بطاقة تبدأ في مرحلة التعلم. الإجابات السهلة المتتالية تخرج البطاقة إلى مرحلة المراجعة، بينما الإجابات الصعبة أو الخاطئة تزيد عدد الإجابات السهلة المطلوبة قبل التخرج. بعد التخرج، تنتقل البطاقة بين فواصل مراجعة متدرجة:
+Morajaaty is intentionally simple and local:
 
-```text
-1 يوم -> 3 أيام -> 7 أيام -> 15 يوما -> 32 يوما -> 90 يوما
-```
+- `data.sqlite3` is created locally and ignored by Git.
+- `.venv` is ignored by Git.
+- `.env` files are ignored by Git.
+- API keys are stored in the local SQLite database managed by the app.
+- The AI companion only sends chat context and tool results when you explicitly use it.
 
-وللفواصل الأكبر، يحاول التطبيق اختيار يوم قريب أقل ازدحاما حتى يخفف ضغط المراجعات اليومية.
-
-## رفيق الذكاء الاصطناعي
-
-رفيق التعلم داخل التطبيق يستطيع استخدام أدوات قراءة محلية مثل:
-
-- قراءة إحصائيات المنصة.
-- قراءة مخطط قاعدة البيانات.
-- تنفيذ استعلامات SQLite للقراءة فقط على بيانات المراجعة.
-
-هذا يجعله قادرا على إجابة أسئلة مثل:
-
-- ما البطاقات الأكثر صعوبة؟
-- كم بطاقة مستحقة اليوم؟
-- هل أدائي يتحسن في آخر أسبوع؟
-- أي قسم يحتاج تركيزا أكبر؟
-
-## الخصوصية
-
-- قاعدة البيانات الافتراضية `data.sqlite3` محلية وغير مرفوعة إلى Git.
-- البيئة الافتراضية `.venv` غير مرفوعة.
-- ملفات `.env` غير مرفوعة.
-- مفاتيح API تحفظ محليا داخل قاعدة البيانات التي يديرها التطبيق.
-
-## هيكل المشروع
+## Project Structure
 
 ```text
 app/
-  main.py        # واجهات API والمنطق الرئيسي
-  database.py    # إنشاء قاعدة SQLite وتحديث مخططها
+  main.py        # FastAPI routes, review logic, AI companion streaming
+  database.py    # SQLite connection, schema creation, migrations
 static/
-  index.html     # واجهة التطبيق
-  app.js         # منطق الواجهة
-  styles.css     # التصميم
+  index.html     # App shell
+  app.js         # Frontend state, routing, review UI, settings, chat
+  styles.css     # RTL interface styling
 examples/
   cards.sample.json
 requirements.txt
 ```
 
-## فحص سريع
+## Development Check
 
 ```powershell
 .\.venv\Scripts\python.exe -m compileall app
 ```
 
-## الرخصة
+Or:
 
-هذا المشروع مفتوح المصدر تحت رخصة MIT. راجع [LICENSE](LICENSE).
+```bash
+python -m compileall app
+```
+
+## Roadmap Ideas
+
+- Export review history and cards.
+- Add optional encryption for stored API keys.
+- Add richer dashboards for long-term learning trends.
+- Add tests around scheduling behavior and import validation.
+- Package the app for simpler desktop installation.
+
+## License
+
+Morajaaty is open source under the [MIT License](LICENSE).
