@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>منصة المراجعة المتباعدة</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">تخطي إلى المحتوى</a>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="القائمة الرئيسية">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">م</span>
+          <div>
+            <strong>مراجعتي</strong>
+            <span>منصة شخصية</span>
+          </div>
+        </div>
+        <nav class="nav-list">
+          <a href="#/categories" data-nav="categories">الأقسام</a>
+          <a href="#/settings" data-nav="settings">الإعدادات</a>
+          <a href="#/companion" data-nav="companion">رفيق الرفقاء</a>
+        </nav>
+      </aside>
+
+      <main id="main" class="main-panel" tabindex="-1">
+        <div id="live-region" class="visually-hidden" aria-live="assertive" aria-atomic="true"></div>
+        <div id="status-region" class="status-line" hidden></div>
+        <section id="view" class="view" aria-label="المحتوى الحالي"></section>
+      </main>
+    </div>
+
+    <dialog id="name-dialog" class="dialog">
+      <form method="dialog" id="name-form">
+        <h2 id="dialog-title">اسم القسم</h2>
+        <label for="dialog-name">الاسم</label>
+        <input id="dialog-name" name="name" autocomplete="off" required />
+        <div class="dialog-actions">
+          <button type="submit" class="primary">حفظ</button>
+          <button type="button" id="dialog-cancel">إلغاء</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>
