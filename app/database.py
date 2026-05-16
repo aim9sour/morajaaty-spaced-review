@@ -65,6 +65,37 @@ def init_db() -> None:
                 value TEXT
             );
 
+            CREATE TABLE IF NOT EXISTS ai_providers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                label TEXT NOT NULL CHECK (length(trim(label)) > 0),
+                provider_kind TEXT NOT NULL DEFAULT 'openai_compatible',
+                base_url TEXT NOT NULL CHECK (length(trim(base_url)) > 0),
+                api_key TEXT NOT NULL,
+                organization TEXT,
+                project TEXT,
+                default_headers TEXT,
+                default_query TEXT,
+                timeout_seconds REAL,
+                max_retries INTEGER,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS provider_models (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                provider_id INTEGER NOT NULL REFERENCES ai_providers(id) ON DELETE CASCADE,
+                model_id TEXT NOT NULL CHECK (length(trim(model_id)) > 0),
+                display_name TEXT,
+                owned_by TEXT,
+                metadata_json TEXT,
+                first_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(provider_id, model_id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_provider_models_provider_id
+                ON provider_models(provider_id);
+
             CREATE TABLE IF NOT EXISTS review_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 card_id INTEGER REFERENCES cards(id) ON DELETE SET NULL,
@@ -90,6 +121,18 @@ def init_db() -> None:
         ensure_column(conn, "cards", "wrong_count", "INTEGER NOT NULL DEFAULT 0")
         ensure_column(conn, "cards", "graduated_count", "INTEGER NOT NULL DEFAULT 0")
         ensure_column(conn, "cards", "last_reviewed_at", "TEXT")
+        ensure_column(conn, "categories", "is_concept_root", "INTEGER NOT NULL DEFAULT 0")
+        ensure_column(conn, "cards", "concept_debt", "INTEGER NOT NULL DEFAULT 0")
+        ensure_column(conn, "review_events", "outcome", "TEXT")
+        conn.execute(
+            """
+            UPDATE cards
+            SET due_at = date(due_at)
+            WHERE due_at IS NOT NULL
+              AND date(due_at) IS NOT NULL
+              AND due_at != date(due_at)
+            """
+        )
         conn.commit()
 
 

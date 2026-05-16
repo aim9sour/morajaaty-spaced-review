@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>منصة المراجعة المتباعدة</title>
-    <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260516-concepts-2" />
   </head>
   <body>
     <a class="skip-link" href="#main">تخطي إلى المحتوى</a>
@@ -36,6 +36,10 @@
         <h2 id="dialog-title">اسم القسم</h2>
         <label for="dialog-name">الاسم</label>
         <input id="dialog-name" name="name" autocomplete="off" required />
+        <label class="checkbox-line" id="dialog-concept-field">
+          <input id="dialog-concept" type="checkbox" />
+          <span>عامله كقسم مفاهيم برمجية</span>
+        </label>
         <div class="dialog-actions">
           <button type="submit" class="primary">حفظ</button>
           <button type="button" id="dialog-cancel">إلغاء</button>
@@ -43,6 +47,6 @@
       </form>
     </dialog>
 
-    <script src="/static/app.js" defer></script>
+    <script src="/static/app.js?v=20260516-concepts-2" defer></script>
   </body>
 </html>

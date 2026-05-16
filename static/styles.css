@@ -220,6 +220,17 @@ button.compact {
   color: var(--muted);
 }
 
+.badge {
+  width: fit-content;
+  border: 1px solid #b8d9d4;
+  border-radius: 999px;
+  background: var(--soft);
+  color: var(--teal-dark);
+  padding: 0.1rem 0.45rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
 .toolbar,
 .row-actions,
 .form-actions {
@@ -311,6 +322,17 @@ button.compact {
 
 .field label {
   font-weight: 700;
+}
+
+.checkbox-line {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+}
+
+.checkbox-line input {
+  width: auto;
 }
 
 input,
@@ -505,6 +527,19 @@ textarea {
   font-size: 1.15rem;
 }
 
+.concept-card {
+  min-height: 260px;
+}
+
+.concept-body {
+  font-size: 1.45rem !important;
+  font-weight: 800;
+}
+
+.concept-picker {
+  max-width: 720px;
+}
+
 .review-actions {
   display: flex;
   flex-wrap: wrap;
@@ -591,6 +626,13 @@ textarea {
 
 .chat-model {
   width: min(420px, 100%);
+}
+
+.chat-controls {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.7fr) minmax(240px, 1fr);
+  gap: 0.6rem;
+  align-items: end;
 }
 
 .messages {
@@ -694,6 +736,11 @@ details.roadmap-trace {
   background: #fffaf1;
 }
 
+details.status-trace {
+  background: #eef6f4;
+  border-color: #b8d9d4;
+}
+
 details.trace summary {
   cursor: pointer;
   color: var(--gold);
@@ -765,6 +812,7 @@ pre {
   }
 
   .settings-grid,
+  .chat-controls,
   .chat-form {
     grid-template-columns: 1fr;
   }

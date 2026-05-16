@@ -1,18 +1,21 @@
 # Morajaaty
 
-**A local-first spaced repetition platform with custom scheduling, JSON imports, learning analytics, and an AI study companion.**
+**A local-first spaced repetition platform with date-based scheduling, flexible imports, learning analytics, and an AI study companion.**
 
 Morajaaty is a lightweight study system built with FastAPI, SQLite, and a vanilla HTML/CSS/JavaScript frontend. It is designed for learners who want full control over their study data, a fast local workflow, and a practical review algorithm that adapts to how well each card is remembered.
 
-The project runs entirely on your machine by default. Your cards, review history, settings, and API keys are stored locally in SQLite. The AI companion is optional and can be enabled by adding your own Gemini API key from the settings page.
+The project runs entirely on your machine by default. Your cards, review history, settings, provider configuration, and API keys are stored locally in SQLite. The AI companion is optional and can be enabled by adding your own Gemini key or an OpenAI-compatible provider from the settings page.
 
 ## Highlights
 
 - **Local-first by design**: no hosted backend, no mandatory account, no remote database.
+- **Date-only review scheduling**: due cards are based on the calendar day, not the exact hour a previous review happened.
 - **Custom spaced repetition engine**: cards move between learning and review stages based on `easy`, `hard`, and `wrong` answers.
-- **Load-balanced scheduling**: longer intervals are placed near the target date while avoiding overloaded review days.
-- **JSON-first imports**: bring your own flashcards in simple `question`/`answer` or `front`/`back` formats.
+- **Load-balanced scheduling**: longer intervals are placed near the target date while avoiding overloaded review days, without hour offsets.
+- **Programming concepts mode**: mark a main category as a concept root to import and review one-face concepts with a separate daily algorithm.
+- **Flexible imports**: bring normal flashcards as JSON, or concepts as JSON strings, text lines, or bracketed items like `[concept]`.
 - **AI study companion**: ask questions about your progress, due workload, difficult cards, and review history.
+- **Gemini and OpenAI-compatible providers**: configure Gemini keys or OpenAI-compatible base URLs, fetch models, and choose defaults from settings.
 - **Read-only analytics tools for the agent**: the companion can inspect local statistics and run safe SQLite read queries.
 - **Fast, dependency-light frontend**: no heavy UI framework; just HTML, CSS, and JavaScript.
 - **Arabic RTL interface**: built for Arabic study workflows while keeping the codebase straightforward and portable.
@@ -22,7 +25,7 @@ The project runs entirely on your machine by default. Your cards, review history
 - **Backend**: FastAPI
 - **Database**: SQLite
 - **Frontend**: Vanilla HTML, CSS, JavaScript
-- **AI integration**: Gemini API with streaming responses
+- **AI integration**: Google GenAI SDK and official OpenAI SDK for compatible providers
 - **Transport**: Server-Sent Events for live assistant output
 
 ## Quick Start
@@ -58,9 +61,11 @@ http://127.0.0.1:8000
 
 ## How It Works
 
-Morajaaty organizes learning content into main categories and subcategories. Cards are imported into subcategories as JSON files, then reviewed through a focused study session.
+Morajaaty organizes learning content into main categories and subcategories. Normal cards are imported into subcategories as flashcards, then reviewed through a focused study session.
 
 Each card starts in the **learning** stage. Repeated `easy` answers graduate the card into the **review** stage. `hard` and `wrong` answers reset or increase the required effort so weak cards get more attention instead of being pushed too far into the future.
+
+Review due dates are stored and evaluated as calendar dates. If you review a card today, it can become due tomorrow regardless of the hour you studied.
 
 Review intervals progress through:
 
@@ -69,6 +74,22 @@ Review intervals progress through:
 ```
 
 For longer intervals, the scheduler checks nearby dates and prefers a day with a lighter workload. This keeps review sessions more balanced over time.
+
+Review summaries separate cards that graduated for the first time from cards that had already graduated before and returned after a mistake.
+
+### Programming Concepts Mode
+
+A main category can be marked as a programming concepts root. Subcategories inside that root accept one-face concept cards instead of normal question/answer cards.
+
+Concepts use a separate progression:
+
+```text
+1 day -> 3 days -> 7 days -> 15 days -> 30 days -> 90 days
+```
+
+Before a concept enters long-term review, `hard` adds 2 daily repetitions and `wrong` adds 4 daily repetitions. During long-term review, `hard` drops the concept back by two interval levels and adds 2 daily repetitions; `wrong` resets the concept back to daily learning.
+
+Concept review sessions allow moving next/previous and jumping directly to an unanswered concept. Once a concept is rated, it leaves the current session.
 
 ## AI Study Companion
 
@@ -86,11 +107,17 @@ Example questions:
 - Did my accuracy improve over the last week?
 - What should I review first?
 
-The companion requires a Gemini API key, which you can add from the settings page. Without a key, the rest of the application still works locally.
+The companion can use Gemini keys or OpenAI-compatible providers. Provider settings include base URL, API key, organization, project, optional headers, optional query parameters, timeout, and retry settings.
+
+From settings, each OpenAI-compatible provider can fetch its available models. Re-fetching updates existing model metadata and adds new models without duplicating the same model id.
+
+During chat, the interface streams status updates, thinking traces, tool calls, and final answers. If one configured key fails, the companion reports the attempt and falls back to another available key when possible.
+
+Without an AI key or provider, the rest of the application still works locally.
 
 ## Import Format
 
-Morajaaty accepts a plain array:
+Normal flashcard subcategories accept a plain JSON array:
 
 ```json
 [
@@ -129,6 +156,23 @@ Or a wrapped object:
 
 See [examples/cards.sample.json](examples/cards.sample.json) for a ready-to-use sample.
 
+Concept subcategories accept JSON strings:
+
+```json
+[
+  "Binary search",
+  "Event loop",
+  "Dependency injection"
+]
+```
+
+They also accept plain text, one concept per line, including bracketed items:
+
+```text
+[انا بطل]
+[تيستاوي]
+```
+
 ## Privacy Model
 
 Morajaaty is intentionally simple and local:
@@ -147,7 +191,7 @@ app/
   database.py    # SQLite connection, schema creation, migrations
 static/
   index.html     # App shell
-  app.js         # Frontend state, routing, review UI, settings, chat
+  app.js         # Frontend state, routing, review UI, settings, providers, chat
   styles.css     # RTL interface styling
 examples/
   cards.sample.json
@@ -158,12 +202,14 @@ requirements.txt
 
 ```powershell
 .\.venv\Scripts\python.exe -m compileall app
+node --check static\app.js
 ```
 
 Or:
 
 ```bash
 python -m compileall app
+node --check static/app.js
 ```
 
 ## Roadmap Ideas
