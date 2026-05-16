@@ -169,9 +169,12 @@ Concept subcategories accept JSON strings:
 They also accept plain text, one concept per line, including bracketed items:
 
 ```text
-[انا بطل]
-[تيستاوي]
+[Binary search]
+[Event loop]
+[Dependency injection]
 ```
+
+See [examples/concepts.sample.txt](examples/concepts.sample.txt) for a plain-text concept import sample.
 
 ## Privacy Model
 
@@ -195,6 +198,7 @@ static/
   styles.css     # RTL interface styling
 examples/
   cards.sample.json
+  concepts.sample.txt
 requirements.txt
 ```
 

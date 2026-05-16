@@ -1,12 +1,16 @@
 [
   {
-    "question": "ما المقصود بالمراجعة المتباعدة؟",
-    "answer": "أسلوب تعلم يعيد عرض المعلومة على فواصل زمنية متزايدة لتقوية الذاكرة طويلة المدى.",
-    "notes": "ابدأ بفواصل قصيرة ثم زدها حسب سهولة التذكر."
+    "question": "What is spaced repetition?",
+    "answer": "A learning technique that reviews information at increasing intervals to strengthen long-term memory.",
+    "notes": "Short intervals are used first, then longer intervals are scheduled as recall improves."
   },
   {
-    "question": "متى تعود البطاقة إلى مرحلة التعلم؟",
-    "answer": "عندما يختار المستخدم إجابة صعبة أو خاطئة بعد دخول البطاقة مرحلة المراجعة.",
-    "notes": "هذا يساعد على علاج نقاط الضعف بدلا من دفنها."
+    "question": "When should a card return to learning?",
+    "answer": "When the learner marks a review-stage card as hard or wrong, so the weak point receives focused practice again.",
+    "notes": "This prevents difficult cards from being pushed too far into the future."
+  },
+  {
+    "front": "What does date-only scheduling solve?",
+    "back": "It makes a card due on the target calendar day regardless of the exact hour it was last reviewed."
   }
 ]

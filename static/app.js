@@ -261,8 +261,8 @@ async function renderLeafCategory(category) {
       <a class="button-link primary" href="#/review/${category.id}">بدء المراجعة</a>
     </div>
     <section class="panel upload-box" aria-labelledby="upload-title">
-      <h2 id="upload-title">${conceptMode ? "رفع مفاهيم JSON" : "رفع بطاقات JSON"}</h2>
-      <p class="subtle">${conceptMode ? "في قسم المفاهيم ارفع قائمة JSON من النصوص داخل []، وكل عنصر يصبح مفهوما بوجه واحد." : "ارفع بطاقات question/answer أو front/back."}</p>
+      <h2 id="upload-title">${conceptMode ? "رفع مفاهيم" : "رفع بطاقات JSON"}</h2>
+      <p class="subtle">${conceptMode ? "في قسم المفاهيم ارفع ملف JSON أو ملف نصي، ويمكن كتابة كل مفهوم داخل [] في سطر مستقل." : "ارفع بطاقات question/answer أو front/back."}</p>
       <form id="upload-form" class="field-stack">
         <div class="field">
           <label for="cards-file">ملف البطاقات</label>
