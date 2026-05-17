@@ -12,6 +12,7 @@ The project runs entirely on your machine by default. Your cards, review history
 - **Date-only review scheduling**: due cards are based on the calendar day, not the exact hour a previous review happened.
 - **Custom spaced repetition engine**: cards move between learning and review stages based on `easy`, `hard`, and `wrong` answers.
 - **Load-balanced scheduling**: longer intervals are placed near the target date while avoiding overloaded review days, without hour offsets.
+- **Multiple prompts per card**: attach several question/answer variants to one card so review sessions rotate the wording without splitting scheduling or statistics.
 - **Programming concepts mode**: mark a main category as a concept root to import and review one-face concepts with a separate daily algorithm.
 - **Flexible imports**: bring normal flashcards as JSON, or concepts as JSON strings, text lines, or bracketed items like `[concept]`.
 - **AI study companion**: ask questions about your progress, due workload, difficult cards, and review history.
@@ -77,6 +78,33 @@ For longer intervals, the scheduler checks nearby dates and prefers a day with a
 
 Review summaries separate cards that graduated for the first time from cards that had already graduated before and returned after a mistake.
 
+### Card Variants
+
+Normal flashcards can have multiple variants. A variant is a different question/answer wording for the same underlying card.
+
+Variants do not become separate review items. The parent card keeps one schedule, one accuracy history, and one set of counters. During review, Morajaaty selects a variant for the due card and records which variant was shown. Future sessions avoid recently shown variants where possible, so a learner is less likely to memorize the card shape or order instead of the idea.
+
+For example, a three-variant card still counts as one card:
+
+```json
+[
+  {
+    "front": "What does idempotency mean in HTTP?",
+    "back": "Repeating the same request has the same intended effect as making it once.",
+    "variants": [
+      {
+        "front": "Why is PUT usually described as idempotent?",
+        "back": "Sending the same PUT multiple times should leave the resource in the same final state."
+      },
+      {
+        "front": "How can idempotency protect a retrying client?",
+        "back": "The client can retry after a network failure without accidentally applying the same operation twice."
+      }
+    ]
+  }
+]
+```
+
 ### Programming Concepts Mode
 
 A main category can be marked as a programming concepts root. Subcategories inside that root accept one-face concept cards instead of normal question/answer cards.
@@ -129,7 +157,7 @@ Normal flashcard subcategories accept a plain JSON array:
 ]
 ```
 
-It also supports `front` and `back` fields:
+They also support `front` and `back` fields:
 
 ```json
 [
@@ -137,6 +165,48 @@ It also supports `front` and `back` fields:
     "front": "Question",
     "back": "Answer",
     "notes": "Optional notes"
+  }
+]
+```
+
+To create several variants for the same card, add a `variants` list. You can keep `front`/`back` on the parent item; those parent fields become the first variant automatically:
+
+```json
+[
+  {
+    "front": "Question wording A",
+    "back": "Answer wording A",
+    "notes": "Optional shared notes",
+    "variants": [
+      {
+        "front": "Question wording B",
+        "back": "Answer wording B"
+      },
+      {
+        "front": "Question wording C",
+        "back": "Answer wording C",
+        "notes": "Optional notes for this wording"
+      }
+    ]
+  }
+]
+```
+
+You can also import a variants-only card:
+
+```json
+[
+  {
+    "variants": [
+      {
+        "front": "Question wording A",
+        "back": "Answer wording A"
+      },
+      {
+        "front": "Question wording B",
+        "back": "Answer wording B"
+      }
+    ]
   }
 ]
 ```
@@ -154,7 +224,7 @@ Or a wrapped object:
 }
 ```
 
-See [examples/cards.sample.json](examples/cards.sample.json) for a ready-to-use sample.
+See [examples/cards.sample.json](examples/cards.sample.json) and [examples/cards.variants.sample.json](examples/cards.variants.sample.json) for ready-to-use samples.
 
 Concept subcategories accept JSON strings:
 
@@ -198,6 +268,7 @@ static/
   styles.css     # RTL interface styling
 examples/
   cards.sample.json
+  cards.variants.sample.json
   concepts.sample.txt
 requirements.txt
 ```

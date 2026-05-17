@@ -336,7 +336,7 @@ function renderCards(cards, conceptMode = false) {
             <tr>
               <td>${escapeHtml(card.question)}</td>
               <td>${escapeHtml(card.answer)}</td>
-              <td>${escapeHtml(card.notes || "")}</td>
+              <td>${escapeHtml(card.notes || "")}${(card.variant_count || 1) > 1 ? ` (${card.variant_count} نسخ)` : ""}</td>
             </tr>
           `)
           .join("")}
@@ -611,7 +611,7 @@ async function rateCurrentCard(rating) {
   try {
     const result = await api(`/api/review/cards/${review.current.id}/answer`, {
       method: "POST",
-      body: JSON.stringify({ rating }),
+      body: JSON.stringify({ rating, variant_id: review.current.variant_id || null }),
     });
     review.ratings[rating] += 1;
     review.graduated += result.first_graduation ? 1 : 0;

@@ -1,0 +1,33 @@
+[
+  {
+    "front": "What is the event loop?",
+    "back": "A runtime mechanism that waits for work, runs callbacks, and coordinates asynchronous tasks.",
+    "notes": "The parent front/back is included as the first variant.",
+    "variants": [
+      {
+        "front": "Why does the event loop matter in JavaScript?",
+        "back": "It lets JavaScript coordinate asynchronous work without blocking the main thread."
+      },
+      {
+        "front": "What problem does an event loop solve?",
+        "back": "It organizes pending callbacks and asynchronous completions so they run at the right time."
+      }
+    ]
+  },
+  {
+    "variants": [
+      {
+        "front": "What is dependency injection?",
+        "back": "Providing an object's dependencies from the outside instead of creating them internally."
+      },
+      {
+        "front": "How does dependency injection help testing?",
+        "back": "Tests can pass fake or controlled dependencies instead of relying on real external services."
+      },
+      {
+        "front": "What design issue does dependency injection reduce?",
+        "back": "It reduces tight coupling between a class and the concrete services it uses."
+      }
+    ]
+  }
+]

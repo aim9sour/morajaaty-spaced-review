@@ -91,6 +91,7 @@ class ChatRequest(BaseModel):
 
 class ReviewAnswer(BaseModel):
     rating: Literal["easy", "hard", "wrong"]
+    variant_id: int | None = None
 
 
 REVIEW_INTERVALS_DAYS = [1, 3, 7, 15, 32, 90]
@@ -228,7 +229,8 @@ def list_cards(category_id: int) -> list[dict[str, Any]]:
             """
             SELECT cards.*,
                 categories.name AS category_name,
-                COALESCE(parent.is_concept_root, categories.is_concept_root, 0) AS concept_mode
+                COALESCE(parent.is_concept_root, categories.is_concept_root, 0) AS concept_mode,
+                MAX(1, (SELECT COUNT(*) FROM card_variants WHERE card_variants.card_id = cards.id)) AS variant_count
             FROM cards
             JOIN categories ON categories.id = cards.category_id
             LEFT JOIN categories parent ON parent.id = categories.parent_id
@@ -307,6 +309,8 @@ def import_cards_list(parsed: Any) -> list[Any]:
             key.casefold() for key in answer_keys
         }:
             return [parsed]
+        if normalized_keys & {"variants", "alternatives", "versions", "forms"}:
+            return [parsed]
         if parsed and all(not isinstance(value, (list, dict)) for value in parsed.values()):
             return [{"question": key, "answer": value} for key, value in parsed.items()]
         keys = ", ".join(str(key) for key in parsed.keys())
@@ -321,6 +325,64 @@ def first_card_value(card: dict[str, Any], keys: tuple[str, ...]) -> str:
         if value is not None:
             return str(value).strip()
     return ""
+
+
+QUESTION_KEYS = ("question", "front", "prompt", "q", "term", "title", "سؤال", "السؤال")
+ANSWER_KEYS = ("answer", "back", "completion", "a", "definition", "meaning", "إجابة", "الاجابة", "الإجابة", "جواب")
+NOTES_KEYS = ("notes", "note", "explanation", "ملاحظات", "شرح")
+VARIANTS_KEYS = ("variants", "alternatives", "versions", "forms")
+
+
+def first_card_list(card: dict[str, Any], keys: tuple[str, ...]) -> list[Any] | None:
+    normalized = {str(key).strip().casefold(): value for key, value in card.items()}
+    for key in keys:
+        value = normalized.get(key.casefold())
+        if value is None:
+            continue
+        if not isinstance(value, list):
+            raise HTTPException(status_code=400, detail=f"{key} must be a list")
+        return value
+    return None
+
+
+def normal_card_variants(card: dict[str, Any], index: int) -> list[tuple[str, str, str | None]]:
+    base_question = first_card_value(card, QUESTION_KEYS)
+    base_answer = first_card_value(card, ANSWER_KEYS)
+    base_notes = first_card_value(card, NOTES_KEYS) or None
+    raw_variants = first_card_list(card, VARIANTS_KEYS)
+
+    variants: list[tuple[str, str, str | None]] = []
+    if base_question or base_answer:
+        if not base_question or not base_answer:
+            keys = ", ".join(str(key) for key in card.keys())
+            raise HTTPException(
+                status_code=400,
+                detail=f"question/front and answer/back are both required in card {index}. Existing keys: {keys}",
+            )
+        variants.append((base_question, base_answer, base_notes))
+
+    if raw_variants is not None:
+        for variant_index, variant in enumerate(raw_variants, start=1):
+            if not isinstance(variant, dict):
+                raise HTTPException(status_code=400, detail=f"variant {variant_index} in card {index} must be an object")
+            question = first_card_value(variant, QUESTION_KEYS)
+            answer = first_card_value(variant, ANSWER_KEYS)
+            notes = first_card_value(variant, NOTES_KEYS) or base_notes
+            if not question or not answer:
+                keys = ", ".join(str(key) for key in variant.keys())
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"question/front and answer/back are both required in variant {variant_index} of card {index}. Existing keys: {keys}",
+                )
+            variants.append((question, answer, notes or None))
+
+    if not variants:
+        keys = ", ".join(str(key) for key in card.keys())
+        raise HTTPException(
+            status_code=400,
+            detail=f"card {index} must include front/back, question/answer, or a variants list. Existing keys: {keys}",
+        )
+    return variants
 
 
 @app.post("/api/categories/{category_id}/cards/import", status_code=201)
@@ -344,7 +406,7 @@ async def import_cards(category_id: int, file: UploadFile = File(...)) -> dict[s
     else:
         cards = import_cards_list(parse_cards_text(text))
 
-    cleaned: list[tuple[str, str, str | None]] = []
+    cleaned: list[list[tuple[str, str, str | None]]] = []
     for index, card in enumerate(cards, start=1):
         if concept_mode:
             if isinstance(card, dict):
@@ -356,28 +418,26 @@ async def import_cards(category_id: int, file: UploadFile = File(...)) -> dict[s
             if not question:
                 raise HTTPException(status_code=400, detail=f"المفهوم رقم {index} فارغ أو غير صالح")
             answer = question
+            cleaned.append([(question, answer, notes or None)])
+            continue
         else:
             if not isinstance(card, dict):
                 raise HTTPException(status_code=400, detail=f"البطاقة رقم {index} غير صالحة")
-            question = first_card_value(card, ("question", "front", "prompt", "q", "term", "title", "سؤال", "السؤال"))
-            answer = first_card_value(
-                card,
-                ("answer", "back", "completion", "a", "definition", "meaning", "إجابة", "الاجابة", "الإجابة", "جواب"),
-            )
-            notes = first_card_value(card, ("notes", "note", "explanation", "ملاحظات", "شرح")) or None
-            if not question or not answer:
-                keys = ", ".join(str(key) for key in card.keys())
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"السؤال والإجابة مطلوبان في البطاقة رقم {index}. المفاتيح الموجودة: {keys}",
-                )
-        cleaned.append((question, answer, notes or None))
+            cleaned.append(normal_card_variants(card, index))
 
     with connect() as conn:
-        conn.executemany(
-            "INSERT INTO cards (category_id, question, answer, notes, due_at) VALUES (?, ?, ?, ?, date('now', 'localtime'))",
-            [(category_id, question, answer, notes) for question, answer, notes in cleaned],
-        )
+        for variants in cleaned:
+            question, answer, notes = variants[0]
+            cursor = conn.execute(
+                "INSERT INTO cards (category_id, question, answer, notes, due_at) VALUES (?, ?, ?, ?, date('now', 'localtime'))",
+                (category_id, question, answer, notes),
+            )
+            card_id = cursor.lastrowid
+            if not concept_mode:
+                conn.executemany(
+                    "INSERT INTO card_variants (card_id, question, answer, notes) VALUES (?, ?, ?, ?)",
+                    [(card_id, variant_question, variant_answer, variant_notes) for variant_question, variant_answer, variant_notes in variants],
+                )
         conn.commit()
         return {"imported": len(cleaned)}
 
@@ -464,8 +524,60 @@ def best_due_date(conn, interval_days: int, from_dt: datetime | None = None) -> 
     return datetime.fromisoformat(best_day)
 
 
-def public_card(row: sqlite3.Row) -> dict[str, Any]:
+def choose_card_variant(conn, card_id: int, exclude_variant_id: int | None = None) -> tuple[dict[str, Any] | None, int]:
+    rows = rows_to_dicts(
+        conn.execute(
+            """
+            SELECT id, question, answer, notes
+            FROM card_variants
+            WHERE card_id = ?
+            ORDER BY RANDOM()
+            """,
+            (card_id,),
+        ).fetchall()
+    )
+    if not rows:
+        return None, 1
+    recent_limit = max(len(rows) - 1, 0)
+    recent_variant_ids = {
+        row["variant_id"]
+        for row in conn.execute(
+            """
+            SELECT variant_id
+            FROM review_events
+            WHERE card_id = ?
+              AND variant_id IS NOT NULL
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (card_id, recent_limit),
+        ).fetchall()
+    }
+    blocked_ids = {variant_id for variant_id in recent_variant_ids if variant_id is not None}
+    if exclude_variant_id is not None:
+        blocked_ids.add(exclude_variant_id)
+    candidates = [row for row in rows if row["id"] not in blocked_ids]
+    if not candidates and exclude_variant_id is not None and len(rows) > 1:
+        candidates = [row for row in rows if row["id"] != exclude_variant_id]
+    if not candidates:
+        candidates = rows
+    return candidates[0], len(rows)
+
+
+def public_card(row: sqlite3.Row, conn=None, exclude_variant_id: int | None = None) -> dict[str, Any]:
     card = row_to_dict(row)
+    if conn is not None and not bool(card.get("concept_mode")):
+        variant, variant_count = choose_card_variant(conn, int(card["id"]), exclude_variant_id)
+        card["variant_count"] = variant_count
+        card["variant_id"] = None
+        if variant is not None:
+            card["variant_id"] = variant["id"]
+            card["question"] = variant["question"]
+            card["answer"] = variant["answer"]
+            card["notes"] = variant["notes"]
+    else:
+        card["variant_count"] = max(int(card.get("variant_count") or 1), 1)
+        card["variant_id"] = None
     card["stats"] = card_stats(row)
     return card
 
@@ -484,7 +596,7 @@ def review_cards(category_id: int) -> dict[str, Any]:
             LEFT JOIN categories parent ON parent.id = categories.parent_id
             WHERE {where_sql}
               AND date(cards.due_at) <= date('now', 'localtime')
-            ORDER BY date(cards.due_at) ASC, cards.id ASC
+            ORDER BY date(cards.due_at) ASC, RANDOM()
             """,
             params,
         ).fetchall()
@@ -504,7 +616,7 @@ def review_cards(category_id: int) -> dict[str, Any]:
         return {
             "category": category_dict(conn, category),
             "concept_mode": category_is_concept_mode(conn, category),
-            "cards": [public_card(row) for row in rows],
+            "cards": [public_card(row, conn) for row in rows],
             "session": row_to_dict(total_row),
         }
 
@@ -536,6 +648,14 @@ def answer_review_card(card_id: int, payload: ReviewAnswer) -> dict[str, Any]:
         interval_index = int(row["interval_index"])
         graduated_count = int(row["graduated_count"])
         concept_mode = bool(row["concept_mode"])
+        variant_id = payload.variant_id if not concept_mode else None
+        if variant_id is not None:
+            variant_exists = conn.execute(
+                "SELECT 1 FROM card_variants WHERE id = ? AND card_id = ?",
+                (variant_id, card_id),
+            ).fetchone()
+            if variant_exists is None:
+                raise HTTPException(status_code=400, detail="نسخة البطاقة غير صالحة")
         concept_debt = int(row["concept_debt"] or 0)
         stage = row["stage"]
         due_at = today_due_date()
@@ -651,10 +771,10 @@ def answer_review_card(card_id: int, payload: ReviewAnswer) -> dict[str, Any]:
         )
         conn.execute(
             """
-            INSERT INTO review_events (card_id, category_id, rating, previous_stage, next_stage, outcome)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO review_events (card_id, variant_id, category_id, rating, previous_stage, next_stage, outcome)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (card_id, row["category_id"], rating, previous_stage, stage, outcome),
+            (card_id, variant_id, row["category_id"], rating, previous_stage, stage, outcome),
         )
         conn.commit()
         updated = conn.execute(
@@ -669,7 +789,7 @@ def answer_review_card(card_id: int, payload: ReviewAnswer) -> dict[str, Any]:
             (card_id,),
         ).fetchone()
         return {
-            "card": public_card(updated),
+            "card": public_card(updated, conn, payload.variant_id),
             "graduated": graduated,
             "first_graduation": first_graduation,
             "regraduated": regraduated,
@@ -1027,6 +1147,7 @@ def build_platform_stats() -> dict[str, Any]:
         root_count = conn.execute("SELECT COUNT(*) AS count FROM categories WHERE parent_id IS NULL").fetchone()["count"]
         leaf_count = conn.execute("SELECT COUNT(*) AS count FROM categories WHERE parent_id IS NOT NULL").fetchone()["count"]
         card_count = conn.execute("SELECT COUNT(*) AS count FROM cards").fetchone()["count"]
+        variant_count = conn.execute("SELECT COUNT(*) AS count FROM card_variants").fetchone()["count"]
         due_today = conn.execute("SELECT COUNT(*) AS count FROM cards WHERE date(due_at) <= date('now', 'localtime')").fetchone()["count"]
         learning = conn.execute("SELECT COUNT(*) AS count FROM cards WHERE stage = 'learning'").fetchone()["count"]
         review = conn.execute("SELECT COUNT(*) AS count FROM cards WHERE stage = 'review'").fetchone()["count"]
@@ -1048,6 +1169,7 @@ def build_platform_stats() -> dict[str, Any]:
         "root_categories": root_count,
         "subcategories": leaf_count,
         "cards": card_count,
+        "card_variants": variant_count,
         "due_today": due_today,
         "learning_cards": learning,
         "review_cards": review,
@@ -1080,7 +1202,8 @@ def database_schema_for_agent() -> dict[str, Any]:
                 "last_reviewed_at",
                 "created_at",
             ],
-            "review_events": ["id", "card_id", "category_id", "rating", "previous_stage", "next_stage", "outcome", "reviewed_at"],
+            "card_variants": ["id", "card_id", "question", "answer", "notes", "created_at"],
+            "review_events": ["id", "card_id", "variant_id", "category_id", "rating", "previous_stage", "next_stage", "outcome", "reviewed_at"],
         },
         "notes": [
             "Only read-only SELECT queries are allowed.",

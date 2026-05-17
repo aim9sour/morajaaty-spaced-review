@@ -53,6 +53,18 @@ def init_db() -> None:
             CREATE INDEX IF NOT EXISTS idx_cards_category_id
                 ON cards(category_id);
 
+            CREATE TABLE IF NOT EXISTS card_variants (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                card_id INTEGER NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+                question TEXT NOT NULL CHECK (length(trim(question)) > 0),
+                answer TEXT NOT NULL CHECK (length(trim(answer)) > 0),
+                notes TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_card_variants_card_id
+                ON card_variants(card_id);
+
             CREATE TABLE IF NOT EXISTS api_keys (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 label TEXT,
@@ -99,6 +111,7 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS review_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 card_id INTEGER REFERENCES cards(id) ON DELETE SET NULL,
+                variant_id INTEGER REFERENCES card_variants(id) ON DELETE SET NULL,
                 category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
                 rating TEXT NOT NULL,
                 previous_stage TEXT,
@@ -124,6 +137,13 @@ def init_db() -> None:
         ensure_column(conn, "categories", "is_concept_root", "INTEGER NOT NULL DEFAULT 0")
         ensure_column(conn, "cards", "concept_debt", "INTEGER NOT NULL DEFAULT 0")
         ensure_column(conn, "review_events", "outcome", "TEXT")
+        ensure_column(conn, "review_events", "variant_id", "INTEGER")
+        conn.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_review_events_card_variant
+                ON review_events(card_id, variant_id, reviewed_at)
+            """
+        )
         conn.execute(
             """
             UPDATE cards

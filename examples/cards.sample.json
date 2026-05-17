@@ -12,5 +12,20 @@
   {
     "front": "What does date-only scheduling solve?",
     "back": "It makes a card due on the target calendar day regardless of the exact hour it was last reviewed."
+  },
+  {
+    "front": "What does HTTP idempotency mean?",
+    "back": "Repeating the same request has the same intended effect as making it once.",
+    "notes": "This is one card with multiple review wordings, not several separate cards.",
+    "variants": [
+      {
+        "front": "Why can a client safely retry an idempotent HTTP request?",
+        "back": "Because repeating the request should not apply a second unintended change."
+      },
+      {
+        "front": "Give a practical example of idempotency.",
+        "back": "Sending the same PUT request multiple times should leave the target resource in the same final state."
+      }
+    ]
   }
 ]
