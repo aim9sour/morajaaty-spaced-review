@@ -136,6 +136,8 @@ def init_db() -> None:
         ensure_column(conn, "cards", "last_reviewed_at", "TEXT")
         ensure_column(conn, "categories", "is_concept_root", "INTEGER NOT NULL DEFAULT 0")
         ensure_column(conn, "cards", "concept_debt", "INTEGER NOT NULL DEFAULT 0")
+        conn.execute("UPDATE cards SET required_easy = 10 WHERE required_easy > 10")
+        conn.execute("UPDATE cards SET concept_debt = 4 WHERE concept_debt > 4")
         ensure_column(conn, "review_events", "outcome", "TEXT")
         ensure_column(conn, "review_events", "variant_id", "INTEGER")
         conn.execute(

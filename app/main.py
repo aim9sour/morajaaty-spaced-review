@@ -96,6 +96,8 @@ class ReviewAnswer(BaseModel):
 
 REVIEW_INTERVALS_DAYS = [1, 3, 7, 15, 32, 90]
 CONCEPT_INTERVALS_DAYS = [1, 3, 7, 15, 30, 90]
+MAX_REQUIRED_EASY = 10
+MAX_CONCEPT_DEBT_DAYS = 4
 
 
 @app.on_event("startup")
@@ -500,6 +502,14 @@ def card_stats(card: sqlite3.Row | dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def capped_required_easy(value: int) -> int:
+    return min(max(value, 2), MAX_REQUIRED_EASY)
+
+
+def capped_concept_debt(value: int) -> int:
+    return min(max(value, 0), MAX_CONCEPT_DEBT_DAYS)
+
+
 def best_due_date(conn, interval_days: int, from_dt: datetime | None = None) -> datetime:
     base = from_dt or datetime.now()
     target = day_start(base + timedelta(days=interval_days))
@@ -643,7 +653,7 @@ def answer_review_card(card_id: int, payload: ReviewAnswer) -> dict[str, Any]:
         easy_count = int(row["easy_count"]) + (1 if rating == "easy" else 0)
         hard_count = int(row["hard_count"]) + (1 if rating == "hard" else 0)
         wrong_count = int(row["wrong_count"]) + (1 if rating == "wrong" else 0)
-        required_easy = int(row["required_easy"])
+        required_easy = capped_required_easy(int(row["required_easy"]))
         easy_streak = int(row["easy_streak"])
         interval_index = int(row["interval_index"])
         graduated_count = int(row["graduated_count"])
@@ -656,7 +666,7 @@ def answer_review_card(card_id: int, payload: ReviewAnswer) -> dict[str, Any]:
             ).fetchone()
             if variant_exists is None:
                 raise HTTPException(status_code=400, detail="نسخة البطاقة غير صالحة")
-        concept_debt = int(row["concept_debt"] or 0)
+        concept_debt = capped_concept_debt(int(row["concept_debt"] or 0))
         stage = row["stage"]
         due_at = today_due_date()
         graduated = False
@@ -683,7 +693,7 @@ def answer_review_card(card_id: int, payload: ReviewAnswer) -> dict[str, Any]:
                     interval_index = min(max(interval_index, 0) + 1, len(CONCEPT_INTERVALS_DAYS) - 1)
                     due_at = concept_due_date(CONCEPT_INTERVALS_DAYS[interval_index])
             elif rating == "hard":
-                concept_debt += 2
+                concept_debt = capped_concept_debt(concept_debt + 2)
                 if stage == "review":
                     interval_index = max(int(interval_index) - 2, 0)
                     due_at = concept_due_date(CONCEPT_INTERVALS_DAYS[interval_index])
@@ -695,7 +705,7 @@ def answer_review_card(card_id: int, payload: ReviewAnswer) -> dict[str, Any]:
                 if stage == "review":
                     concept_debt = 4
                 else:
-                    concept_debt += 4
+                    concept_debt = capped_concept_debt(concept_debt + 4)
                 stage = "learning"
                 interval_index = -1
                 easy_streak = 0
@@ -718,12 +728,12 @@ def answer_review_card(card_id: int, payload: ReviewAnswer) -> dict[str, Any]:
                     requeue_after_ratio = 1.0
             elif rating == "hard":
                 easy_streak = 0
-                required_easy += 1
+                required_easy = capped_required_easy(required_easy + 1)
                 due_at = today_due_date()
                 requeue_after_ratio = 0.3
             else:
                 easy_streak = 0
-                required_easy += 2
+                required_easy = capped_required_easy(required_easy + 2)
                 due_at = today_due_date()
                 requeue_after_ratio = 0.1
         else:
@@ -733,7 +743,7 @@ def answer_review_card(card_id: int, payload: ReviewAnswer) -> dict[str, Any]:
             else:
                 stage = "learning"
                 easy_streak = 0
-                required_easy = max(required_easy, 2) + (1 if rating == "hard" else 2)
+                required_easy = capped_required_easy(max(required_easy, 2) + (1 if rating == "hard" else 2))
                 interval_index = -1
                 due_at = today_due_date()
                 requeue_after_ratio = 0.3 if rating == "hard" else 0.1
