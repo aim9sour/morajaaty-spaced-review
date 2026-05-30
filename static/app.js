@@ -421,7 +421,7 @@ function renderReviewSession(focusTarget = null) {
   }
 
   view.innerHTML = `
-    <section class="review-stage" aria-labelledby="review-title">
+    <section class="review-stage">
       <header class="review-topbar">
         <div>
           <p class="eyebrow">جلسة مراجعة</p>
@@ -449,14 +449,14 @@ function renderReviewSession(focusTarget = null) {
         </section>
         ${review.revealed ? `
           <section class="answer-block" aria-label="الإجابة">
-            <p class="block-label">الإجابة</p>
+            <p id="answer-label" class="block-label review-focus-body" tabindex="-1">الإجابة</p>
             <p id="answer-body" class="review-focus-body" tabindex="-1">${escapeHtml(card.answer)}</p>
           </section>
         ` : ""}
         ${review.revealed && card.notes ? `
-          <section class="notes-block" aria-labelledby="notes-title">
+          <section class="notes-block">
             <h2 id="notes-title">الملاحظات</h2>
-            <p>${escapeHtml(card.notes)}</p>
+            <p id="notes-body" class="review-focus-body" tabindex="-1">${escapeHtml(card.notes)}</p>
           </section>
         ` : ""}
       </article>
@@ -501,7 +501,7 @@ function renderReviewSession(focusTarget = null) {
 
   document.querySelector("#destroy-card").addEventListener("click", destroyCurrentCard);
   document.querySelector("#finish-review").addEventListener("click", () => renderReviewSummary(true));
-  focusReviewBody(focusTarget);
+  handleReviewFocus(focusTarget, card);
 }
 
 function renderConceptReviewSession(focusTarget = null) {
@@ -511,7 +511,7 @@ function renderConceptReviewSession(focusTarget = null) {
   const pending = review.queue.length;
   const currentNumber = pending ? review.currentIndex + 1 : 0;
   view.innerHTML = `
-    <section class="review-stage" aria-labelledby="review-title">
+    <section class="review-stage">
       <header class="review-topbar">
         <div>
           <p class="eyebrow">جلسة مفاهيم برمجية</p>
@@ -591,18 +591,34 @@ function moveConcept(direction) {
   advanceReviewCard("question");
 }
 
+function focusReviewControl(selector) {
+  const element = document.querySelector(selector);
+  if (!element) return;
+  element.focus();
+}
+
+function handleReviewFocus(target, card) {
+  if (!target || !card) return;
+  if (target === "answer") {
+    announce(card.answer, { speak: true });
+    if (card.notes) {
+      focusReviewControl("#notes-body");
+      return;
+    }
+    focusReviewControl("#answer-label");
+    return;
+  }
+  announce(card.question, { speak: true });
+  focusReviewControl("#show-answer");
+}
+
 function focusReviewBody(target) {
   if (!target) return;
   const selector = target === "answer" ? "#answer-body" : "#question-body";
-  const focusElement = () => {
-    const element = document.querySelector(selector);
-    if (!element) return;
-    element.focus();
-    element.scrollIntoView({ block: "center", inline: "nearest" });
-  };
-  focusElement();
-  requestAnimationFrame(focusElement);
-  setTimeout(focusElement, 60);
+  const element = document.querySelector(selector);
+  if (!element) return;
+  element.focus();
+  element.scrollIntoView({ block: "center", inline: "nearest" });
 }
 
 async function rateCurrentCard(rating) {
@@ -628,8 +644,7 @@ async function rateCurrentCard(rating) {
       const offset = Math.max(1, Math.ceil(review.initialTotal * result.requeue_after_ratio));
       review.queue.splice(Math.min(offset - 1, review.queue.length), 0, result.card);
     }
-    announce("تم تسجيل التقييم");
-    advanceReviewCard("question");
+    advanceReviewCard("next-question");
   } catch (error) {
     showError(error);
   }
