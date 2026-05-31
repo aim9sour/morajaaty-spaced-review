@@ -18,6 +18,7 @@ const dialogName = document.querySelector("#dialog-name");
 const dialogCancel = document.querySelector("#dialog-cancel");
 const dialogConceptField = document.querySelector("#dialog-concept-field");
 const dialogConcept = document.querySelector("#dialog-concept");
+let reviewSpeechClearTimer = null;
 
 function announce(text, options = {}) {
   if (statusRegion) {
@@ -28,6 +29,20 @@ function announce(text, options = {}) {
   if (options.speak) {
     liveRegion.textContent = text || "";
   }
+}
+
+function speakReviewText(text) {
+  if (!liveRegion) return;
+  if (reviewSpeechClearTimer) clearTimeout(reviewSpeechClearTimer);
+  liveRegion.textContent = "";
+  requestAnimationFrame(() => {
+    liveRegion.textContent = text || "";
+    if (text) {
+      reviewSpeechClearTimer = setTimeout(() => {
+        if (liveRegion.textContent === text) liveRegion.textContent = "";
+      }, 1500);
+    }
+  });
 }
 
 function showError(error) {
@@ -420,88 +435,132 @@ function renderReviewSession(focusTarget = null) {
     return;
   }
 
+  renderNormalReviewShell();
+  updateNormalReviewCardView(focusTarget, card, completed, totalMoves);
+}
+
+function renderNormalReviewShell() {
+  if (document.querySelector("#normal-review-stage")) return;
   view.innerHTML = `
-    <section class="review-stage">
+    <section id="normal-review-stage" class="review-stage">
       <header class="review-topbar">
         <div>
           <p class="eyebrow">جلسة مراجعة</p>
-          <h1 id="review-title">${escapeHtml(review.category.name)}</h1>
-          <p class="subtle">تمت مراجعة ${completed}، متبقّي في هذه الجلسة ${review.queue.length + 1}، وإجمالي الحركة الحالية ${totalMoves} بطاقة.</p>
+          <h1 id="review-title"></h1>
+          <p id="review-session-line" class="subtle"></p>
         </div>
         <div class="toolbar">
           <button id="finish-review">إنهاء المراجعة الآن</button>
-          <a class="button-link" href="${reviewReturnUrl()}">الخروج</a>
+          <a id="review-exit-link" class="button-link" href="#/categories">الخروج</a>
         </div>
       </header>
 
       <div class="review-progress" aria-label="تقدم الجلسة">
-        <span style="width: ${Math.min(100, Math.round((completed / Math.max(totalMoves, 1)) * 100))}%"></span>
+        <span id="review-progress-bar"></span>
       </div>
 
       <article class="study-card">
         <div class="card-kicker">
-          <span>${escapeHtml(card.category_name || "بطاقة")}</span>
-          <span>${card.stats.stage === "learning" ? "مرحلة التعلم" : "مراجعة مجدولة"}</span>
+          <span id="card-category-name"></span>
+          <span id="card-stage-label"></span>
         </div>
         <section class="question-block" aria-labelledby="question-title">
           <h2 id="question-title">السؤال</h2>
-          <p id="question-body" class="review-focus-body" tabindex="-1">${escapeHtml(card.question)}</p>
+          <p id="question-body" class="review-focus-body" tabindex="-1"></p>
         </section>
-        ${review.revealed ? `
-          <section class="answer-block" aria-label="الإجابة">
-            <p id="answer-label" class="block-label review-focus-body" tabindex="-1">الإجابة</p>
-            <p id="answer-body" class="review-focus-body" tabindex="-1">${escapeHtml(card.answer)}</p>
-          </section>
-        ` : ""}
-        ${review.revealed && card.notes ? `
-          <section class="notes-block">
-            <h2 id="notes-title">الملاحظات</h2>
-            <p id="notes-body" class="review-focus-body" tabindex="-1">${escapeHtml(card.notes)}</p>
-          </section>
-        ` : ""}
+        <section id="answer-section" class="answer-block" aria-label="الإجابة" hidden>
+          <p id="answer-label" class="block-label review-focus-body" tabindex="-1">الإجابة</p>
+          <p id="answer-body" class="review-focus-body" tabindex="-1"></p>
+        </section>
+        <section id="notes-section" class="notes-block" hidden>
+          <h2 id="notes-title">الملاحظات</h2>
+          <p id="notes-body" class="review-focus-body" tabindex="-1"></p>
+        </section>
       </article>
 
       <div class="review-actions" aria-label="إجراءات البطاقة">
-        ${review.revealed ? `
-          <button class="rating easy" data-rate="easy">سهل</button>
-          <button class="rating hard" data-rate="hard">صعب</button>
-          <button class="rating wrong" data-rate="wrong">خطأ</button>
-        ` : `<button class="primary" id="show-answer">عرض الإجابة</button>`}
+        <button class="primary" id="show-answer">عرض الإجابة</button>
+        <button id="rating-easy" class="rating easy" data-rate="easy" hidden disabled>سهل</button>
+        <button id="rating-hard" class="rating hard" data-rate="hard" hidden disabled>صعب</button>
+        <button id="rating-wrong" class="rating wrong" data-rate="wrong" hidden disabled>خطأ</button>
         <button class="danger" id="destroy-card">إعدام البطاقة</button>
       </div>
 
       <details class="review-details">
         <summary>إحصائيات هذه البطاقة</summary>
         <dl class="card-stat-grid">
-          <div><dt>عدد المراجعات</dt><dd>${card.stats.review_count}</dd></div>
-          <div><dt>سهل</dt><dd>${card.stats.easy_count}</dd></div>
-          <div><dt>صعب</dt><dd>${card.stats.hard_count}</dd></div>
-          <div><dt>خطأ</dt><dd>${card.stats.wrong_count}</dd></div>
-          <div><dt>مرات دخول المراجعة</dt><dd>${card.stats.graduated_count}</dd></div>
-          <div><dt>المطلوب للتخرج</dt><dd>${card.stats.remaining_easy} سهل متتالي</dd></div>
-          <div><dt>الدقة</dt><dd>${card.stats.accuracy_percent === null ? "لا توجد بعد" : `${card.stats.accuracy_percent}%`}</dd></div>
-          <div><dt>موعدها الحالي</dt><dd>${formatDateOnly(card.stats.due_at)}</dd></div>
-          <div><dt>آخر مراجعة</dt><dd>${card.stats.last_reviewed_at ? formatDateTime(card.stats.last_reviewed_at) : "لم تراجع بعد"}</dd></div>
+          <div><dt>عدد المراجعات</dt><dd id="stat-review-count"></dd></div>
+          <div><dt>سهل</dt><dd id="stat-easy-count"></dd></div>
+          <div><dt>صعب</dt><dd id="stat-hard-count"></dd></div>
+          <div><dt>خطأ</dt><dd id="stat-wrong-count"></dd></div>
+          <div><dt>مرات دخول المراجعة</dt><dd id="stat-graduated-count"></dd></div>
+          <div><dt>المطلوب للتخرج</dt><dd id="stat-remaining-easy"></dd></div>
+          <div><dt>الدقة</dt><dd id="stat-accuracy"></dd></div>
+          <div><dt>موعدها الحالي</dt><dd id="stat-due-at"></dd></div>
+          <div><dt>آخر مراجعة</dt><dd id="stat-last-reviewed"></dd></div>
         </dl>
       </details>
     </section>
   `;
 
-  const showAnswer = document.querySelector("#show-answer");
-  if (showAnswer) {
-    showAnswer.addEventListener("click", () => {
-      review.revealed = true;
-      renderReviewSession("answer");
-    });
-  }
-
+  document.querySelector("#show-answer").addEventListener("click", () => {
+    const review = state.review;
+    if (!review?.current) return;
+    review.revealed = true;
+    renderReviewSession("answer");
+  });
   document.querySelectorAll("[data-rate]").forEach((button) => {
     button.addEventListener("click", () => rateCurrentCard(button.dataset.rate));
   });
-
   document.querySelector("#destroy-card").addEventListener("click", destroyCurrentCard);
   document.querySelector("#finish-review").addEventListener("click", () => renderReviewSummary(true));
+}
+
+function updateNormalReviewCardView(focusTarget, card, completed, totalMoves) {
+  const review = state.review;
+  document.querySelector("#review-title").textContent = review.category.name;
+  document.querySelector("#review-session-line").textContent =
+    `تمت مراجعة ${completed}، متبقّي في هذه الجلسة ${review.queue.length + 1}، وإجمالي الحركة الحالية ${totalMoves} بطاقة.`;
+  document.querySelector("#review-exit-link").setAttribute("href", reviewReturnUrl());
+  document.querySelector("#review-progress-bar").style.width =
+    `${Math.min(100, Math.round((completed / Math.max(totalMoves, 1)) * 100))}%`;
+  document.querySelector("#card-category-name").textContent = card.category_name || "بطاقة";
+  document.querySelector("#card-stage-label").textContent =
+    card.stats.stage === "learning" ? "مرحلة التعلم" : "مراجعة مجدولة";
+  document.querySelector("#question-body").textContent = card.question;
+
+  const showAnswer = Boolean(review.revealed);
+  document.querySelector("#answer-section").hidden = !showAnswer;
+  document.querySelector("#answer-body").textContent = showAnswer ? card.answer : "";
+  const showNotes = Boolean(showAnswer && card.notes);
+  document.querySelector("#notes-section").hidden = !showNotes;
+  document.querySelector("#notes-body").textContent = showNotes ? card.notes : "";
+
+  document.querySelector("#stat-review-count").textContent = card.stats.review_count;
+  document.querySelector("#stat-easy-count").textContent = card.stats.easy_count;
+  document.querySelector("#stat-hard-count").textContent = card.stats.hard_count;
+  document.querySelector("#stat-wrong-count").textContent = card.stats.wrong_count;
+  document.querySelector("#stat-graduated-count").textContent = card.stats.graduated_count;
+  document.querySelector("#stat-remaining-easy").textContent = `${card.stats.remaining_easy} سهل متتالي`;
+  document.querySelector("#stat-accuracy").textContent =
+    card.stats.accuracy_percent === null ? "لا توجد بعد" : `${card.stats.accuracy_percent}%`;
+  document.querySelector("#stat-due-at").textContent = formatDateOnly(card.stats.due_at);
+  document.querySelector("#stat-last-reviewed").textContent =
+    card.stats.last_reviewed_at ? formatDateTime(card.stats.last_reviewed_at) : "لم تراجع بعد";
+
+  setReviewMode(review.revealed ? "answer" : "question");
   handleReviewFocus(focusTarget, card);
+}
+
+function setReviewMode(mode) {
+  const showingQuestion = mode === "question";
+  const showAnswer = document.querySelector("#show-answer");
+  showAnswer.hidden = !showingQuestion;
+  showAnswer.disabled = !showingQuestion;
+  document.querySelectorAll("[data-rate]").forEach((button) => {
+    button.hidden = showingQuestion;
+    button.disabled = showingQuestion;
+  });
 }
 
 function renderConceptReviewSession(focusTarget = null) {
@@ -600,7 +659,7 @@ function focusReviewControl(selector) {
 function handleReviewFocus(target, card) {
   if (!target || !card) return;
   if (target === "answer") {
-    announce(card.answer, { speak: true });
+    speakReviewText(card.answer);
     if (card.notes) {
       focusReviewControl("#notes-body");
       return;
@@ -608,7 +667,7 @@ function handleReviewFocus(target, card) {
     focusReviewControl("#answer-label");
     return;
   }
-  announce(card.question, { speak: true });
+  speakReviewText(card.question);
   focusReviewControl("#show-answer");
 }
 
