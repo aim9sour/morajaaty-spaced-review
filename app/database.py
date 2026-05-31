@@ -137,6 +137,21 @@ def init_db() -> None:
         ensure_column(conn, "categories", "is_concept_root", "INTEGER NOT NULL DEFAULT 0")
         ensure_column(conn, "cards", "concept_debt", "INTEGER NOT NULL DEFAULT 0")
         conn.execute("UPDATE cards SET required_easy = 10 WHERE required_easy > 10")
+        conn.execute(
+            """
+            UPDATE cards
+            SET required_easy = 2
+            WHERE stage = 'review'
+              AND required_easy > 2
+              AND EXISTS (
+                  SELECT 1
+                  FROM categories
+                  LEFT JOIN categories parent ON parent.id = categories.parent_id
+                  WHERE categories.id = cards.category_id
+                    AND COALESCE(parent.is_concept_root, categories.is_concept_root, 0) = 0
+              )
+            """
+        )
         conn.execute("UPDATE cards SET concept_debt = 4 WHERE concept_debt > 4")
         ensure_column(conn, "review_events", "outcome", "TEXT")
         ensure_column(conn, "review_events", "variant_id", "INTEGER")

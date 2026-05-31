@@ -96,6 +96,7 @@ class ReviewAnswer(BaseModel):
 
 REVIEW_INTERVALS_DAYS = [1, 3, 7, 15, 32, 90]
 CONCEPT_INTERVALS_DAYS = [1, 3, 7, 15, 30, 90]
+BASE_REQUIRED_EASY = 2
 MAX_REQUIRED_EASY = 10
 MAX_CONCEPT_DEBT_DAYS = 4
 
@@ -503,7 +504,7 @@ def card_stats(card: sqlite3.Row | dict[str, Any]) -> dict[str, Any]:
 
 
 def capped_required_easy(value: int) -> int:
-    return min(max(value, 2), MAX_REQUIRED_EASY)
+    return min(max(value, BASE_REQUIRED_EASY), MAX_REQUIRED_EASY)
 
 
 def capped_concept_debt(value: int) -> int:
@@ -719,6 +720,7 @@ def answer_review_card(card_id: int, payload: ReviewAnswer) -> dict[str, Any]:
                     stage = "review"
                     interval_index = 0
                     easy_streak = 0
+                    required_easy = BASE_REQUIRED_EASY
                     graduated_count += 1
                     due_at = best_due_date(conn, REVIEW_INTERVALS_DAYS[interval_index])
                     graduated = True
