@@ -377,6 +377,7 @@ async function renderReview(id) {
     ratings: { easy: 0, hard: 0, wrong: 0 },
     graduated: 0,
     regraduated: 0,
+    ratingPending: false,
     startedAt: new Date(),
   };
   advanceReviewCard();
@@ -554,12 +555,13 @@ function updateNormalReviewCardView(focusTarget, card, completed, totalMoves) {
 
 function setReviewMode(mode) {
   const showingQuestion = mode === "question";
+  const ratingPending = Boolean(state.review?.ratingPending);
   const showAnswer = document.querySelector("#show-answer");
   showAnswer.hidden = !showingQuestion;
   showAnswer.disabled = !showingQuestion;
   document.querySelectorAll("[data-rate]").forEach((button) => {
     button.hidden = showingQuestion;
-    button.disabled = showingQuestion;
+    button.disabled = showingQuestion || ratingPending;
   });
 }
 
@@ -682,11 +684,19 @@ function focusReviewBody(target) {
 
 async function rateCurrentCard(rating) {
   const review = state.review;
-  if (!review?.current) return;
+  if (!review?.current || review.ratingPending) return;
+  review.ratingPending = true;
+  document.querySelectorAll("[data-rate]").forEach((button) => {
+    button.disabled = true;
+  });
   try {
     const result = await api(`/api/review/cards/${review.current.id}/answer`, {
       method: "POST",
-      body: JSON.stringify({ rating, variant_id: review.current.variant_id || null }),
+      body: JSON.stringify({
+        rating,
+        variant_id: review.current.variant_id || null,
+        review_count: review.current.stats?.review_count ?? review.current.review_count ?? 0,
+      }),
     });
     review.ratings[rating] += 1;
     review.graduated += result.first_graduation ? 1 : 0;
@@ -706,6 +716,17 @@ async function rateCurrentCard(rating) {
     advanceReviewCard("next-question");
   } catch (error) {
     showError(error);
+  } finally {
+    if (state.review === review) {
+      review.ratingPending = false;
+      if (review.conceptMode) {
+        document.querySelectorAll("[data-rate]").forEach((button) => {
+          button.disabled = false;
+        });
+      } else {
+        setReviewMode(review.revealed ? "answer" : "question");
+      }
+    }
   }
 }
 

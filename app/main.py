@@ -5,7 +5,7 @@ import json
 import math
 import re
 from collections.abc import AsyncGenerator
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal
 
@@ -92,6 +92,7 @@ class ChatRequest(BaseModel):
 class ReviewAnswer(BaseModel):
     rating: Literal["easy", "hard", "wrong"]
     variant_id: int | None = None
+    review_count: int = Field(ge=0)
 
 
 REVIEW_INTERVALS_DAYS = [1, 3, 7, 15, 32, 90]
@@ -481,6 +482,8 @@ def card_stats(card: sqlite3.Row | dict[str, Any]) -> dict[str, Any]:
     easy_count = int(card["easy_count"] or 0)
     hard_count = int(card["hard_count"] or 0)
     wrong_count = int(card["wrong_count"] or 0)
+    concept_mode = bool(card["concept_mode"]) if "concept_mode" in card.keys() else False
+    interval_days = CONCEPT_INTERVALS_DAYS if concept_mode else REVIEW_INTERVALS_DAYS
     return {
         "stage": card["stage"],
         "due_at": card["due_at"],
@@ -488,7 +491,7 @@ def card_stats(card: sqlite3.Row | dict[str, Any]) -> dict[str, Any]:
         "required_easy": card["required_easy"],
         "remaining_easy": max(int(card["required_easy"]) - int(card["easy_streak"]), 0),
         "interval_index": card["interval_index"],
-        "current_interval_days": REVIEW_INTERVALS_DAYS[card["interval_index"]]
+        "current_interval_days": interval_days[card["interval_index"]]
         if int(card["interval_index"]) >= 0
         else None,
         "review_count": review_count,
@@ -497,7 +500,7 @@ def card_stats(card: sqlite3.Row | dict[str, Any]) -> dict[str, Any]:
         "wrong_count": wrong_count,
         "graduated_count": card["graduated_count"],
         "concept_debt": card["concept_debt"] if "concept_debt" in card.keys() else 0,
-        "concept_mode": bool(card["concept_mode"]) if "concept_mode" in card.keys() else False,
+        "concept_mode": concept_mode,
         "last_reviewed_at": card["last_reviewed_at"],
         "accuracy_percent": round((easy_count / review_count) * 100) if review_count else None,
     }
@@ -615,9 +618,9 @@ def review_cards(category_id: int) -> dict[str, Any]:
             f"""
             SELECT
                 COUNT(*) AS total_cards,
-                SUM(CASE WHEN date(cards.due_at) <= date('now', 'localtime') THEN 1 ELSE 0 END) AS due_cards,
-                SUM(CASE WHEN cards.stage = 'learning' THEN 1 ELSE 0 END) AS learning_cards,
-                SUM(CASE WHEN cards.stage = 'review' THEN 1 ELSE 0 END) AS review_cards
+                COALESCE(SUM(CASE WHEN date(cards.due_at) <= date('now', 'localtime') THEN 1 ELSE 0 END), 0) AS due_cards,
+                COALESCE(SUM(CASE WHEN cards.stage = 'learning' THEN 1 ELSE 0 END), 0) AS learning_cards,
+                COALESCE(SUM(CASE WHEN cards.stage = 'review' THEN 1 ELSE 0 END), 0) AS review_cards
             FROM cards
             JOIN categories ON categories.id = cards.category_id
             WHERE {where_sql}
@@ -648,6 +651,10 @@ def answer_review_card(card_id: int, payload: ReviewAnswer) -> dict[str, Any]:
         ).fetchone()
         if row is None:
             raise HTTPException(status_code=404, detail="البطاقة غير موجودة")
+        if date.fromisoformat(str(row["due_at"])[:10]) > datetime.now().date():
+            raise HTTPException(status_code=409, detail="هذه البطاقة ليست مستحقة للمراجعة الآن")
+        if int(row["review_count"]) != payload.review_count:
+            raise HTTPException(status_code=409, detail="بيانات البطاقة تغيرت. حدّث الجلسة ثم حاول مرة أخرى")
 
         previous_stage = row["stage"]
         rating = payload.rating
