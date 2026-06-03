@@ -514,6 +514,11 @@ textarea {
   font-weight: 700;
 }
 
+.review-focus-body {
+  white-space: pre-wrap;
+  line-height: 1.7;
+}
+
 .review-focus-body:focus {
   outline: 3px solid var(--focus);
   outline-offset: 4px;
@@ -532,8 +537,8 @@ textarea {
 }
 
 .concept-body {
-  font-size: 1.45rem !important;
-  font-weight: 800;
+  font-size: 1.25rem !important;
+  font-weight: 500;
 }
 
 .concept-picker {

@@ -289,9 +289,15 @@ def parse_cards_file(raw: bytes) -> Any:
 
 
 def parse_bracketed_concepts_text(text: str) -> list[str]:
-    concepts = [match.strip() for match in re.findall(r"\[([^\[\]\r\n]+)\]", text) if match.strip()]
+    if re.search(r"^\s*---\s*$", text, flags=re.MULTILINE):
+        chunks = re.split(r"^\s*---\s*$", text, flags=re.MULTILINE)
+        return [c.strip() for c in chunks if c.strip()]
+    concepts = [match.strip() for match in re.findall(r"\[(.*?)\]", text, flags=re.DOTALL) if match.strip()]
     if concepts:
         return concepts
+    if "\n\n" in text or "\r\n\r\n" in text:
+        chunks = re.split(r"\n\s*\n", text)
+        return [c.strip() for c in chunks if c.strip()]
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     if lines:
         return [line.removeprefix("[").removesuffix("]").strip() for line in lines if line.removeprefix("[").removesuffix("]").strip()]
